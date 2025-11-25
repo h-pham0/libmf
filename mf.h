@@ -44,6 +44,8 @@ struct mf_parameter
     mf_int nr_threads;
     mf_int nr_bins;
     mf_int nr_iters;
+    // Number of negatives per positive for BPR
+    mf_int nr_bpr_neg;
     mf_float lambda_p1;
     mf_float lambda_p2;
     mf_float lambda_q1;

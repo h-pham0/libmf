@@ -1324,6 +1324,11 @@ inline void SolverBase::run()
                          XMMlambda_p2, XMMlambda_q2,
                          XMMeta, XMMrk_slow,
                          XMMrk_fast);
+    // Scale learning rate if using BPR with multiple negatives per positive
+    mf_int repeats = (param.fun == P_ROW_BPR_MFOC || param.fun == P_COL_BPR_MFOC)
+        ? std::max<mf_int>(1, param.nr_bpr_neg) : 1;
+    if(repeats > 1 && (param.fun == P_ROW_BPR_MFOC || param.fun == P_COL_BPR_MFOC))
+        XMMeta = _mm_mul_ps(XMMeta, _mm_set1_ps(1.0f/static_cast<mf_float>(repeats)));
     while(!scheduler.is_terminated())
     {
         arrange_block(XMMloss, XMMerror);
@@ -1332,16 +1337,20 @@ inline void SolverBase::run()
             N = block->get_current();
             p = model.P+(mf_long)N->u*model.k;
             q = model.Q+(mf_long)N->v*model.k;
-            pG = PG+N->u*2;
-            qG = QG+N->v*2;
-            prepare_for_sg_update(XMMz, XMMloss, XMMerror);
-            sg_update(0, kALIGN, XMMz, XMMlambda_p1, XMMlambda_q1,
-                    XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_slow);
-            if(slow_only)
-                continue;
-            update();
-            sg_update(kALIGN, model.k, XMMz, XMMlambda_p1, XMMlambda_q1,
-                    XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_slow);
+            for(mf_int rep = 0; rep < repeats; ++rep)
+            {
+                pG = PG+N->u*2;
+                qG = QG+N->v*2;
+                prepare_for_sg_update(XMMz, XMMloss, XMMerror);
+                sg_update(0, kALIGN, XMMz, XMMlambda_p1, XMMlambda_q1,
+                          XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_slow);
+                if(!slow_only)
+                {
+                    update();
+                    sg_update(kALIGN, model.k, XMMz, XMMlambda_p1, XMMlambda_q1,
+                              XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_slow);
+                }
+            }
         }
         finalize(XMMloss, XMMerror);
     }
@@ -1409,6 +1418,11 @@ inline void SolverBase::run()
     load_fixed_variables(XMMlambda_p1, XMMlambda_q1,
                          XMMlambda_p2, XMMlambda_q2,
                          XMMeta, XMMrk_slow, XMMrk_fast);
+    // Scale learning rate if using BPR with multiple negatives per positive
+    mf_int repeats = (param.fun == P_ROW_BPR_MFOC || param.fun == P_COL_BPR_MFOC)
+        ? std::max<mf_int>(1, param.nr_bpr_neg) : 1;
+    if(repeats > 1 && (param.fun == P_ROW_BPR_MFOC || param.fun == P_COL_BPR_MFOC))
+        XMMeta = _mm256_mul_ps(XMMeta, _mm256_set1_ps(1.0f/static_cast<mf_float>(repeats)));
     while(!scheduler.is_terminated())
     {
         arrange_block(XMMloss, XMMerror);
@@ -1417,16 +1431,20 @@ inline void SolverBase::run()
             N = block->get_current();
             p = model.P+(mf_long)N->u*model.k;
             q = model.Q+(mf_long)N->v*model.k;
-            pG = PG+N->u*2;
-            qG = QG+N->v*2;
-            prepare_for_sg_update(XMMz, XMMloss, XMMerror);
-            sg_update(0, kALIGN, XMMz, XMMlambda_p1, XMMlambda_q1,
-                      XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_slow);
-            if(slow_only)
-                continue;
-            update();
-            sg_update(kALIGN, model.k, XMMz, XMMlambda_p1, XMMlambda_q1,
-                      XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_fast);
+            for(mf_int rep = 0; rep < repeats; ++rep)
+            {
+                pG = PG+N->u*2;
+                qG = QG+N->v*2;
+                prepare_for_sg_update(XMMz, XMMloss, XMMerror);
+                sg_update(0, kALIGN, XMMz, XMMlambda_p1, XMMlambda_q1,
+                          XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_slow);
+                if(!slow_only)
+                {
+                    update();
+                    sg_update(kALIGN, model.k, XMMz, XMMlambda_p1, XMMlambda_q1,
+                              XMMlambda_p2, XMMlambda_q2, XMMeta, XMMrk_fast);
+                }
+            }
         }
         finalize(XMMloss, XMMerror);
     }
@@ -1479,6 +1497,11 @@ void SolverBase::finalize(__m128d XMMloss, __m128d XMMerror)
 inline void SolverBase::run()
 {
     load_fixed_variables();
+    // Scale learning rate if using BPR with multiple negatives per positive
+    mf_int repeats = (param.fun == P_ROW_BPR_MFOC || param.fun == P_COL_BPR_MFOC)
+        ? std::max<mf_int>(1, param.nr_bpr_neg) : 1;
+    if(repeats > 1 && (param.fun == P_ROW_BPR_MFOC || param.fun == P_COL_BPR_MFOC))
+        param.eta = param.eta/static_cast<mf_float>(repeats);
     while(!scheduler.is_terminated())
     {
         arrange_block();
@@ -1487,14 +1510,18 @@ inline void SolverBase::run()
             N = block->get_current();
             p = model.P+(mf_long)N->u*model.k;
             q = model.Q+(mf_long)N->v*model.k;
-            pG = PG+N->u*2;
-            qG = QG+N->v*2;
-            prepare_for_sg_update();
-            sg_update(0, kALIGN, rk_slow);
-            if(slow_only)
-                continue;
-            update();
-            sg_update(kALIGN, model.k, rk_fast);
+            for(mf_int rep = 0; rep < repeats; ++rep)
+            {
+                pG = PG+N->u*2;
+                qG = QG+N->v*2;
+                prepare_for_sg_update();
+                sg_update(0, kALIGN, rk_slow);
+                if(!slow_only)
+                {
+                    update();
+                    sg_update(kALIGN, model.k, rk_fast);
+                }
+            }
         }
         finalize();
     }
@@ -4661,6 +4688,7 @@ mf_parameter mf_get_default_param()
     param.nr_threads = 12;
     param.nr_bins = 20;
     param.nr_iters = 20;
+    param.nr_bpr_neg = 1;
     param.lambda_p1 = 0.0f;
     param.lambda_q1 = 0.0f;
     param.lambda_p2 = 0.1f;

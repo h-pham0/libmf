@@ -56,6 +56,7 @@ string train_help()
 "-n <bins>: set number of bins (may be adjusted by LIBMF)\n"
 "-p <path>: set path to the validation set\n"
 "-v <fold>: set number of folds for cross validation\n"
+"--num-neg <K>: number of negatives per positive for BPR (default 1)\n"
 "--quiet: quiet mode (no outputs)\n"
 "--nmf: perform non-negative matrix factorization\n"
 "--disk: perform disk-level training (will generate a buffer file)\n");
@@ -246,6 +247,17 @@ Option parse_option(int argc, char **argv)
             if(!is_numerical(argv[i]))
                 throw invalid_argument("-n should be followed by a number");
             option.param.nr_bins = atoi(argv[i]);
+        }
+        else if(args[i].compare("--num-neg") == 0)
+        {
+            if((i+1) >= argc)
+                throw invalid_argument("need to specify K after --num-neg");
+            i++;
+            if(!is_numerical(argv[i]))
+                throw invalid_argument("--num-neg should be followed by a number");
+            option.param.nr_bpr_neg = atoi(argv[i]);
+            if(option.param.nr_bpr_neg < 1)
+                throw invalid_argument("--num-neg must be >= 1");
         }
         else if(args[i].compare("--nmf") == 0)
         {
